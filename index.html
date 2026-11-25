@@ -23,8 +23,15 @@
   #panel.show { transform:translateY(0); opacity:1; pointer-events:auto; }
   #panel h2 { font-size:19px; margin-bottom:3px; }
   #panel p { font-size:13px; opacity:.85; margin-bottom:12px; line-height:1.45; }
-  #panel a.tour { display:block; text-align:center; background:#2e7cc4; color:#fff; text-decoration:none; font-weight:700; font-size:14px; padding:11px 10px; border-radius:9px; }
-  #panel a.tour:hover { background:#3a8ad4; }
+  #panel .tour { display:block; width:100%; border:none; cursor:pointer; font-family:inherit; text-align:center; background:#2e7cc4; color:#fff; font-weight:700; font-size:14px; padding:11px 10px; border-radius:9px; }
+  #panel .tour:hover { background:#3a8ad4; }
+  #tourOverlay { position:fixed; inset:0; z-index:30; background:#0e1a24; display:none; flex-direction:column; }
+  #tourOverlay.show { display:flex; }
+  #tourBar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; background:rgba(11,25,38,.95); color:#fff; }
+  #tourBar span { font-size:14.5px; font-weight:700; }
+  #tourClose { pointer-events:auto; cursor:pointer; border:1px solid rgba(255,255,255,.35); background:rgba(31,63,90,.85); color:#fff; font-size:13px; font-weight:600; padding:8px 14px; border-radius:20px; font-family:inherit; }
+  #tourClose:hover { background:rgba(46,124,196,.9); }
+  #tourFrame { flex:1; width:100%; border:0; background:#0e1a24; }
   #panel .close { position:absolute; top:8px; right:12px; background:none; border:none; color:#fff; font-size:19px; cursor:pointer; opacity:.75; line-height:1; }
   #loading { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; color:#cfe6ff; font-size:15px; background:#0e1a24; transition:opacity .4s; }
   @media (max-width:560px){ #title h1{font-size:18px;} #hint{display:none;} }
@@ -59,7 +66,12 @@
   <button class="close" id="panelClose" aria-label="Cerrar">×</button>
   <h2 id="panelTitle">Casa 1</h2>
   <p>Modelo Casco · 1 planta · Steel framing<br>3 dormitorios · 2 baños</p>
-  <a class="tour" href="https://lombema14-code.github.io/recorrido-1820-casco/" target="_blank" rel="noopener">Ver recorrido interior</a>
+  <button class="tour" id="btnTour">Entrar a la casa</button>
+</div>
+
+<div id="tourOverlay">
+  <div id="tourBar"><span id="tourTitle">Casa 1 · Recorrido interior</span><button id="tourClose">✕ Volver al proyecto</button></div>
+  <iframe id="tourFrame" title="Recorrido interior" allow="fullscreen"></iframe>
 </div>
 
 <script type="module">
@@ -849,6 +861,15 @@ canvas.addEventListener('pointerup', e => {
   const hits = raycaster.intersectObjects(houses, true);
   if (hits.length) selectHouse(hits[0].object.userData.houseIndex);
 });
+const tourOverlay = document.getElementById('tourOverlay');
+const tourFrame = document.getElementById('tourFrame');
+const tourTitle = document.getElementById('tourTitle');
+document.getElementById('btnTour').addEventListener('click', () => {
+  tourTitle.textContent = 'Casa ' + (selected + 1) + ' · Recorrido interior';
+  if (!tourFrame.src) tourFrame.src = TOUR_URL;
+  tourOverlay.classList.add('show');
+});
+document.getElementById('tourClose').addEventListener('click', () => tourOverlay.classList.remove('show'));
 document.getElementById('btnHome').addEventListener('click', overview);
 document.getElementById('panelClose').addEventListener('click', overview);
 const btnOrbit = document.getElementById('btnOrbit');
