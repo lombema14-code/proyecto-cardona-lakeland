@@ -78,8 +78,18 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9fc7e8);
-scene.fog = new THREE.Fog(0x9fc7e8, 1400, 3400);
+// cielo con degradé de tarde: azul arriba, horizonte cálido
+(function(){
+  const c = document.createElement('canvas'); c.width = 4; c.height = 512;
+  const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 512);
+  gr.addColorStop(0, '#5f9fd6'); gr.addColorStop(0.45, '#9cc3e4');
+  gr.addColorStop(0.75, '#d9e6ee'); gr.addColorStop(1, '#f4dcae');
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 512);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = tex;
+})();
+scene.fog = new THREE.Fog(0xdfe7ec, 1500, 3800);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.5, 5000);
 const HOME_POS = new THREE.Vector3(500, 620, 740);
@@ -95,20 +105,21 @@ controls.minDistance = 25;
 controls.maxDistance = 2400;
 controls.autoRotateSpeed = 0.7;
 
-const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x4a6b3a, 0.85);
+// sol cálido de tarde, desde el oeste, sombras suaves
+const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x4a6b3a, 0.75);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff2dd, 1.9);
-sun.position.set(500, 560, 260);
+const sun = new THREE.DirectionalLight(0xffdfae, 2.1);
+sun.position.set(-650, 430, 330);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -820; sun.shadow.camera.right = 820;
-sun.shadow.camera.top = 520; sun.shadow.camera.bottom = -520;
-sun.shadow.camera.far = 2400;
+sun.shadow.camera.left = -950; sun.shadow.camera.right = 950;
+sun.shadow.camera.top = 650; sun.shadow.camera.bottom = -650;
+sun.shadow.camera.far = 2800;
 sun.shadow.bias = -0.0006;
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+scene.add(new THREE.AmbientLight(0xffffff, 0.12));
 
-// ---------- materiales compartidos ----------
+// ---------- materiales compartidos del sitio ----------
 const M = {
   grassLot:  new THREE.MeshStandardMaterial({ color:0x69a24e, roughness:1 }),
   grassDry:  new THREE.MeshStandardMaterial({ color:0x7da457, roughness:1 }),
@@ -126,6 +137,7 @@ const M = {
   roofBrown: new THREE.MeshStandardMaterial({ color:0x7d4a38, roughness:.9, flatShading:true, side:THREE.DoubleSide }),
   metalRoof: new THREE.MeshStandardMaterial({ color:0xb4b8bc, roughness:.45, metalness:.35 }),
   glass:     new THREE.MeshStandardMaterial({ color:0x22384a, roughness:.25, metalness:.35 }),
+  glassDark: new THREE.MeshStandardMaterial({ color:0x2a3d4d, roughness:.25, metalness:.3 }),
   door:      new THREE.MeshStandardMaterial({ color:0x24507e, roughness:.6 }),
   white:     new THREE.MeshStandardMaterial({ color:0xf2efe9, roughness:.8 }),
   trunk:     new THREE.MeshStandardMaterial({ color:0x6b4a2f, roughness:1 }),
@@ -134,7 +146,6 @@ const M = {
   lineWhite: new THREE.MeshBasicMaterial({ color:0xe8e8e2 }),
   lineYellow:new THREE.MeshBasicMaterial({ color:0xf2c230 }),
 };
-const stuccoCols = [0xf0e9db, 0xe9e2d2, 0xf3ede0, 0xe6dcc8, 0xefe7da, 0xece1cd];
 
 // ---------- geometrías compartidas ----------
 const G = {
@@ -169,12 +180,31 @@ lotE.rotation.x = -Math.PI/2; lotE.position.set(250, 0, 0); lotE.receiveShadow =
 // borde del lote
 flat(M.concrete, LOT_W+3, 2, 0, -LOT_D/2, 0.03);
 flat(M.concrete, LOT_W+3, 2, 0,  LOT_D/2, 0.03);
+// variación de tonos de verde sobre el pasto (manchas grandes y suaves)
+(function(){
+  const circ = new THREE.CircleGeometry(1, 18);
+  const mats = [0x5f9a48, 0x74ab54, 0x86b364, 0x679c4a, 0x7fae5c].map(c => new THREE.MeshStandardMaterial({ color:c, roughness:1 }));
+  for (let i = 0; i < 52; i++) {
+    const x = -580 + rnd() * 1160, z = -152 + rnd() * 304;
+    if (Math.abs(z) < 22 && x > -430) continue;                          // calle interna
+    if (Math.abs(Math.abs(z) - 75) < 46 && x > -130 && x < 565) continue; // filas de casas
+    if (x > -512 && x < -398 && Math.abs(z) < 108) continue;              // estacionamiento
+    if (x > -562 && x < -478 && Math.abs(z) < 98) continue;               // edificio existente
+    const m = new THREE.Mesh(circ, mats[i % mats.length]);
+    m.rotation.x = -Math.PI/2;
+    m.position.set(x, 0.028, z);
+    m.scale.set(16 + rnd() * 30, 10 + rnd() * 20, 1);
+    m.receiveShadow = true;
+    scene.add(m);
+  }
+})();
 // manchas de maleza en el campo abierto
 (function(){
   const circ = new THREE.CircleGeometry(1, 14);
   for (let i = 0; i < 30; i++) {
     const x = -420 + rnd() * 980, z = -140 + rnd() * 280;
     if (Math.abs(z) < 34 && x > -430) continue;              // no sobre la calle interna
+    if (Math.abs(Math.abs(z) - 75) < 44 && x > -130 && x < 565) continue; // no sobre las casas
     if (x > -510 && x < -400 && Math.abs(z) < 105) continue; // no sobre el estacionamiento
     if (x > -560 && x < -480 && Math.abs(z) < 95) continue;  // no sobre el edificio
     const m = new THREE.Mesh(circ, rnd() > .45 ? M.brush : M.brushDry);
@@ -187,11 +217,15 @@ flat(M.concrete, LOT_W+3, 2, 0,  LOT_D/2, 0.03);
 })();
 
 // ---------- US Highway 98 (borde oeste, corre norte-sur) ----------
-const HWY_X = -628;
-flat(M.asphalt, 46, 1700, HWY_X, 0, 0.04);
-for (let z = -830; z <= 830; z += 36) flat(M.lineYellow, 1.1, 18, HWY_X, z, 0.12);
-flat(M.lineWhite, 1, 1700, HWY_X - 21, 0, 0.1);
-flat(M.lineWhite, 1, 1700, HWY_X + 21, 0, 0.1);
+// Cuatro carriles con cantero central de pasto y banquinas.
+const HWY_X = -632;
+flat(M.asphalt, 68, 1700, HWY_X, 0, 0.04);
+flat(M.grassOut, 12, 1700, HWY_X, 0, 0.055);                       // cantero central
+for (const s of [-1, 1]) {
+  flat(M.lineYellow, 0.9, 1700, HWY_X + s * 7.2, 0, 0.1);          // líneas amarillas del cantero
+  flat(M.lineWhite, 1, 1700, HWY_X + s * 32, 0, 0.1);              // borde de calzada
+  for (let z = -830; z <= 830; z += 36) flat(M.lineWhite, 1.1, 16, HWY_X + s * 19.5, z, 0.11); // divisoria de carriles
+}
 // cartel de la ruta pintado sobre el asfalto, a lo largo de la calzada
 (function(){
   const c = document.createElement('canvas'); c.width = 1024; c.height = 96;
@@ -203,7 +237,7 @@ flat(M.lineWhite, 1, 1700, HWY_X + 21, 0, 0.1);
   const geo = new THREE.PlaneGeometry(200, 19);
   geo.rotateX(-Math.PI/2); geo.rotateY(Math.PI/2); // texto a lo largo de z, se lee de sur a norte
   const p = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map:tex, transparent:true }));
-  p.position.set(HWY_X, 0.16, 150); scene.add(p);
+  p.position.set(HWY_X - 16, 0.16, 150); scene.add(p);
 })();
 
 // ---------- edificio existente (frente oeste, sobre la ruta) ----------
@@ -277,7 +311,7 @@ for (let x = -400; x <= 565; x += 30) flat(M.lineWhite, 14, 0.9, x, STREET_Y, 0.
 flat(M.sidewalk, 992, 4, 84, STREET_Y - 14, 0.08);
 flat(M.sidewalk, 992, 4, 84, STREET_Y + 14, 0.08);
 
-// ---------- techo a cuatro aguas (hip) de las casas ----------
+// ---------- techo a cuatro aguas genérico (vecinos) ----------
 function hipRoofGeo(w, d, h, ridge){
   const hw = w/2, hd = d/2, r = ridge/2;
   const v = [
@@ -291,52 +325,419 @@ function hipRoofGeo(w, d, h, ridge){
   geo.computeVertexNormals();
   return geo;
 }
-const roofGeo = hipRoofGeo(71, 41, 7, 34);
-const winGeo = new THREE.BoxGeometry(4.6, 4.2, 0.3);
-const winGeoS = new THREE.BoxGeometry(3.2, 3.4, 0.3);
 
-// ---------- constructor de casa (modelo Casco simplificado) ----------
-// Huella aprox. 67 x 37 pies. Frente local = +z (puerta y porch).
-function buildHouse(idx){
-  const grp = new THREE.Group();
-  const wallMat = new THREE.MeshStandardMaterial({ color: stuccoCols[idx % stuccoCols.length], roughness:.85 });
-  box(M.slab, 69, 1, 39, 0, 0.5, 0, grp);
-  box(wallMat, 67, 10, 37, 0, 6, 0, grp);
-  const roof = new THREE.Mesh(roofGeo, idx % 2 ? M.roofAlt : M.roof);
-  roof.position.y = 11; roof.castShadow = true; roof.receiveShadow = true; grp.add(roof);
-  box(M.concrete, 16, 0.5, 7, -8, 1.2, 21.5, grp);
-  box(M.white, 0.9, 8.4, 0.9, -15, 5.4, 24.2, grp);
-  box(M.white, 0.9, 8.4, 0.9, -1, 5.4, 24.2, grp);
-  box(M.roof, 18, 0.6, 8.6, -8, 9.9, 21.8, grp);
-  box(M.door, 3.6, 7.6, 0.35, -8, 4.8, 18.6, grp);
-  for (const wx of [-24, 8, 24]) {
-    const w = new THREE.Mesh(winGeo, M.glass); w.position.set(wx, 6.4, 18.6); grp.add(w);
-    box(M.white, 5.2, 0.45, 0.4, wx, 8.7, 18.6, grp, false);
-  }
-  for (const s of [-1, 1]) {
-    for (const wz of [-9, 9]) {
-      const w = new THREE.Mesh(winGeoS, M.glass);
-      w.position.set(s * 33.6, 6.4, wz); w.rotation.y = Math.PI/2; grp.add(w);
-    }
-    const wb = new THREE.Mesh(winGeo, M.glass); wb.position.set(s * 16, 6.4, -18.6); grp.add(wb);
-  }
-  flat(M.concrete, 15, 26, 10, 32, 0.09, grp);
-  grp.userData.wallMat = wallMat;
-  return grp;
+// =====================================================================
+// CASA CASCO REAL (exterior)
+// Geometría y materiales tomados del modelo Casco del recorrido interior:
+// mismas medidas (huella aprox. 67 x 37 pies, frente/porch al este),
+// mismas paredes con sus ventanas y puertas reales, techos a cuatro aguas,
+// porch propio y patio trasero. El interior no se modela (vidrios tonalizados);
+// se incluye piso y cielorraso para que no se vea hueca.
+// Se construye UNA vez y su geometría se fusiona por material, así las 11
+// copias comparten geometría y la página queda liviana.
+// =====================================================================
+const CM = {
+  stucco:  new THREE.MeshStandardMaterial({ color:0xf6e9d2, roughness:.93 }),
+  wallInt: new THREE.MeshStandardMaterial({ color:0xf1efe9, roughness:.9 }),
+  ceiling: new THREE.MeshStandardMaterial({ color:0xf7f6f2, roughness:.95 }),
+  roof:    new THREE.MeshStandardMaterial({ color:0x7e7a74, roughness:.88, side:THREE.DoubleSide }),
+  fascia:  new THREE.MeshStandardMaterial({ color:0xeeebe4, roughness:.6, side:THREE.DoubleSide }),
+  trim:    new THREE.MeshStandardMaterial({ color:0xf4f3ef, roughness:.45 }),
+  glass:   new THREE.MeshStandardMaterial({ color:0x9db8c8, roughness:.08, metalness:.25, transparent:true, opacity:.38, side:THREE.DoubleSide, depthWrite:false }),
+  concrete:new THREE.MeshStandardMaterial({ color:0xb8b4ac, roughness:.9 }),
+  found:   new THREE.MeshStandardMaterial({ color:0xb9b3a8, roughness:1 }),
+  floor:   new THREE.MeshStandardMaterial({ color:0x9c7c55, roughness:.6 }),
+  door:    new THREE.MeshStandardMaterial({ color:0xf6f5f1, roughness:.45 }),
+  extDoor: new THREE.MeshStandardMaterial({ color:0x435263, roughness:.4 }),
+  metal:   new THREE.MeshStandardMaterial({ color:0x8a8d90, roughness:.35, metalness:.6 }),
+  steel:   new THREE.MeshStandardMaterial({ color:0xd2d5d8, roughness:.3, metalness:.85 }),
+  ac:      new THREE.MeshStandardMaterial({ color:0x9fa4a8, roughness:.6, metalness:.3 }),
+  dark:    new THREE.MeshStandardMaterial({ color:0x26282b, roughness:.45 }),
+  wood:    new THREE.MeshStandardMaterial({ color:0x8a6f52, roughness:.8 }),
+};
+const CEIL = 9.333;           // cielorraso 9'-4"
+const EXT_H = 9.62;           // coronamiento de pared exterior
+const SOFFIT = 9.475;         // nivel de alero
+const FASCIA = 0.42;
+const SLOPE = 5 / 12;         // pendiente del techo
+const OVER = 1.5;             // vuelo del alero
+const TE = 0.67, TI = 0.4;    // espesor de pared exterior / interior
+
+let house = null;             // grupo en construcción (apunta a la plantilla)
+const colliders = [];
+const glassPanes = [];
+function addMesh(geo, mat, parent, cast = true, recv = true){
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = cast; m.receiveShadow = recv;
+  (parent || house).add(m); return m;
+}
+// caja en coordenadas del modelo: x0..x1, y0..y1, z0..z1
+function wbox(x0, y0, z0, x1, y1, z1, mat, opt = {}){
+  const m = addMesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat, opt.parent || house, opt.cast !== false);
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  return m;
+}
+// polígono en planta (x,z) -> superficie horizontal a altura y
+function hpoly(pts, y, mat, up = true, parent){
+  const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, up ? -z : z)));
+  const geo = new THREE.ShapeGeometry(sh); geo.rotateX(up ? -Math.PI / 2 : Math.PI / 2); geo.translate(0, y, 0);
+  return addMesh(geo, mat, parent || house, false, true);
+}
+const rect = (x0, z0, x1, z1) => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+function grp(x, z, rot = 0){
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rot; house.add(g); return g;
+}
+function lb(g, w, h, d, mat, x = 0, y = 0, z = 0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y + h / 2, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+}
+function lc(g, r, h, mat, x = 0, y = 0, z = 0, seg = 24, r2){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r2 ?? r, h, seg), mat);
+  m.position.set(x, y + h / 2, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
 }
 
+// ---------- paredes con aberturas (mismo sistema del modelo Casco) ----------
+const WIN = (a, b, sill = 2.9, head = 7.5) => ({ a, b, sill, head, kind: 'win' });
+const DOOR = (a, b, head = 6.83, leaf = null) => ({ a, b, sill: 0, head, kind: 'door', leaf });
+function wall(x0, z0, x1, z1, t, h, ops = [], ext = 0){
+  const alongX = z0 === z1; const lo = alongX ? Math.min(x0, x1) : Math.min(z0, z1); const hi = alongX ? Math.max(x0, x1) : Math.max(z0, z1);
+  const c = alongX ? z0 : x0; const ht = t / 2;
+  const s0 = lo - ht, s1 = hi + ht; // extiende para cerrar las esquinas
+  const mat = ext ? CM.stucco : CM.wallInt;
+  const piece = (a, b, y0, y1, collide) => {
+    if (b - a < 0.01 || y1 - y0 < 0.01) return;
+    const geo = alongX ? new THREE.BoxGeometry(b - a, y1 - y0, t) : new THREE.BoxGeometry(t, y1 - y0, b - a);
+    const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true;
+    if (alongX) m.position.set((a + b) / 2, (y0 + y1) / 2, c); else m.position.set(c, (y0 + y1) / 2, (a + b) / 2);
+    house.add(m);
+    if (y0 === 0) { // zócalo pintado de 4" en la cara interior
+      for (const sg of (ext ? [-ext] : [-1, 1])) {
+        const p0 = sg > 0 ? ht : -ht - 0.045, p1 = sg > 0 ? ht + 0.045 : -ht;
+        if (alongX) wbox(a, 0, c + p0, b, 0.36, c + p1, CM.trim, { cast: false }); else wbox(c + p0, 0, a, c + p1, 0.36, b, CM.trim, { cast: false });
+      }
+    }
+    if (collide) colliders.push(alongX ? { x0: a, x1: b, z0: c - ht, z1: c + ht } : { x0: c - ht, x1: c + ht, z0: a, z1: b });
+  };
+  const sorted = [...ops].sort((p, q) => p.a - q.a); let cur = s0;
+  for (const o of sorted) {
+    piece(cur, o.a, 0, h, true);
+    if (o.sill > 0) piece(o.a, o.b, 0, o.sill, true);
+    piece(o.a, o.b, o.head, h, false);
+    cur = o.b;
+    addOpeningTrim(alongX, c, o, t, ext);
+  }
+  piece(cur, s1, 0, h, true);
+}
+function addOpeningTrim(alongX, c, o, t, ext){
+  const W = 0.25, D = 0.06; const mid = (o.a + o.b) / 2, w = o.b - o.a;
+  const P = (along, y, perp) => alongX ? [along, y, c + perp] : [c + perp, y, along];
+  const bx = (along0, along1, y0, y1, p0, p1, mat, collide = false) => {
+    if (alongX) wbox(along0, y0, c + p0, along1, y1, c + p1, mat, { collide }); else wbox(c + p0, y0, along0, c + p1, y1, along1, mat, { collide });
+  };
+  const sides = ext ? [-ext] : [-1, 1];
+  const hT = t / 2;
+  for (const sgn of sides) {
+    const p0 = sgn > 0 ? hT : -hT - D, p1 = sgn > 0 ? hT + D : -hT;
+    bx(o.a - W, o.a, o.sill > 0 ? o.sill - 0.15 : 0, o.head + W, p0, p1, CM.trim);
+    bx(o.b, o.b + W, o.sill > 0 ? o.sill - 0.15 : 0, o.head + W, p0, p1, CM.trim);
+    bx(o.a - W, o.b + W, o.head, o.head + W, p0, p1, CM.trim);
+  }
+  if (ext) { // banda de terminación exterior
+    const sgn = ext, p0 = sgn > 0 ? hT : -hT - D * 2, p1 = sgn > 0 ? hT + D * 2 : -hT;
+    bx(o.a - 0.35, o.a, o.sill > 0 ? o.sill - 0.2 : 0, o.head + 0.35, p0, p1, CM.trim);
+    bx(o.b, o.b + 0.35, o.sill > 0 ? o.sill - 0.2 : 0, o.head + 0.35, p0, p1, CM.trim);
+    bx(o.a - 0.35, o.b + 0.35, o.head, o.head + 0.35, p0, p1, CM.trim);
+  }
+  if (o.kind === 'win') {
+    // antepecho, vidrio y marcos
+    bx(o.a - 0.2, o.b + 0.2, o.sill - 0.08, o.sill, -hT - 0.15, hT + 0.15, CM.trim);
+    const g = new THREE.Mesh(new THREE.PlaneGeometry(w, o.head - o.sill), CM.glass);
+    if (!alongX) g.rotation.y = Math.PI / 2;
+    g.position.set(...P(mid, (o.sill + o.head) / 2, 0)); house.add(g); glassPanes.push(g);
+    const ym = (o.sill + o.head) / 2;
+    bx(o.a, o.b, ym - 0.06, ym + 0.06, -0.08, 0.08, CM.trim);           // travesaño central
+    bx(mid - 0.03, mid + 0.03, o.sill, o.head, -0.05, 0.05, CM.trim);    // parteluz
+    bx(o.a, o.a + 0.12, o.sill, o.head, -0.1, 0.1, CM.trim); bx(o.b - 0.12, o.b, o.sill, o.head, -0.1, 0.1, CM.trim);
+    bx(o.a, o.b, o.sill, o.sill + 0.12, -0.1, 0.1, CM.trim); bx(o.a, o.b, o.head - 0.12, o.head, -0.1, 0.1, CM.trim);
+  }
+  if (o.kind === 'door' && o.leaf && o.leaf.swing) {
+    // puerta abierta a 90° sobre su bisagra, con picaporte en ambas caras
+    const sd = o.leaf.side, lw = w - 0.08, lh = o.head - 0.04, lt = 0.12, mat = o.leaf.mat || CM.door;
+    const ac = o.leaf.hinge === 'a' ? o.a + 0.05 + lt / 2 : o.b - 0.05 - lt / 2;
+    const pA = sd > 0 ? hT : -hT - lw, pB = sd > 0 ? hT + lw : -hT;
+    bx(ac - lt / 2, ac + lt / 2, 0.03, lh, pA, pB, mat);
+    for (const f of [-1, 1]) for (const [y0, y1] of [[0.55, 3.0], [3.55, lh - 0.45]]) {
+      const a0 = f > 0 ? ac + lt / 2 : ac - lt / 2 - 0.015, a1 = a0 + 0.015;
+      bx(a0, a1, y0, y1, pA + 0.33, pB - 0.33, mat);
+    }
+    for (const yy of [0.75, lh - 0.75]) bx(ac - lt / 2 - 0.01, ac + lt / 2 + 0.01, yy - 0.18, yy + 0.18, sd > 0 ? hT : -hT - 0.04, sd > 0 ? hT + 0.04 : -hT, CM.metal); // bisagras
+    const pk = sd * (hT + lw - 0.22), toward = -sd;
+    for (const f of [-1, 1]) {
+      const af = ac + f * lt / 2;
+      const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 20), CM.metal);
+      if (alongX) rose.rotation.z = Math.PI / 2; else rose.rotation.x = Math.PI / 2;
+      rose.position.set(...P(af + f * 0.015, 3.0, pk)); house.add(rose);
+      bx(Math.min(af, af + f * 0.11), Math.max(af, af + f * 0.11), 2.975, 3.025, pk - 0.025, pk + 0.025, CM.metal);
+      const l0 = pk, l1 = pk + toward * 0.4;
+      bx(Math.min(af + f * 0.09, af + f * 0.13), Math.max(af + f * 0.09, af + f * 0.13), 2.97, 3.03, Math.min(l0, l1), Math.max(l0, l1), CM.metal);
+    }
+  } else if (o.kind === 'door' && o.leaf) {
+    // hoja abierta, apoyada plana contra la cara interior de la pared
+    const sd = o.leaf.side, lw = w - 0.05, lh = o.head - 0.05, lt = 0.15;
+    const a0 = o.leaf.hinge === 'a' ? o.a - lw : o.b, a1 = a0 + lw;
+    const pc = sd * (hT + D + 0.03 + lt / 2);
+    bx(a0, a1, 0.02, lh, pc - lt / 2, pc + lt / 2, o.leaf.mat || CM.door);
+    const ka = o.leaf.hinge === 'a' ? a0 + 0.3 : a1 - 0.3; // pomo cerca del borde libre, ambas caras
+    for (const f of [-1, 1]) {
+      const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 20), CM.steel);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 10), CM.steel);
+      if (alongX) { rose.rotation.x = Math.PI / 2; } else { rose.rotation.z = Math.PI / 2; }
+      rose.position.set(...P(ka, 3.1, pc + f * (lt / 2 + 0.015))); knob.position.set(...P(ka, 3.1, pc + f * (lt / 2 + 0.1)));
+      knob.castShadow = true; house.add(rose, knob);
+    }
+  }
+}
+
+// ---------- techos a cuatro aguas sólidos, con fascia y sofito ----------
+function solidMesh(tris, mat, uvFn){
+  const pos = [], uv = [];
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), n = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+  for (const [a, b, c, dir, face] of tris) {
+    A.set(...a); B.set(...b); C.set(...c);
+    n.crossVectors(e1.subVectors(B, A), e2.subVectors(C, A));
+    let p = [a, b, c]; if (n.dot(new THREE.Vector3(...dir)) < 0) p = [a, c, b];
+    for (const q of p) { pos.push(...q); uv.push(...uvFn(q, face)); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return addMesh(g, mat, house, true, true);
+}
+function hipRoof(x0, z0, x1, z1, yBase){
+  const W = z1 - z0, rise = (W / 2) * SLOPE, yT = yBase + FASCIA, yR = yT + rise, zc = (z0 + z1) / 2;
+  const r1 = [x0 + W / 2, yR, zc], r2 = [x1 - W / 2, yR, zc];
+  const NW = [x0, yT, z0], NE = [x1, yT, z0], SE = [x1, yT, z1], SW = [x0, yT, z1];
+  const tris = [
+    [NW, NE, r2, [0, 1, -1], 'n'], [NW, r2, r1, [0, 1, -1], 'n'],
+    [SW, SE, r2, [0, 1, 1], 's'], [SW, r2, r1, [0, 1, 1], 's'],
+    [NW, SW, r1, [-1, 1, 0], 'w'], [NE, SE, r2, [1, 1, 0], 'e'],
+  ];
+  const k = 1 / Math.cos(Math.atan(SLOPE));
+  const top = solidMesh(tris, CM.roof, (q, f) => f === 'n' ? [q[0], (q[2] - z0) * k] : f === 's' ? [q[0], (z1 - q[2]) * k] : f === 'w' ? [q[2], (q[0] - x0) * k] : [q[2], (x1 - q[0]) * k]);
+  top.userData.isRoof = true;
+  const b = yBase; const NWb = [x0, b, z0], NEb = [x1, b, z0], SEb = [x1, b, z1], SWb = [x0, b, z1];
+  const ft = [
+    [NWb, NEb, NE, [0, 0, -1]], [NWb, NE, NW, [0, 0, -1]], [SWb, SEb, SE, [0, 0, 1]], [SWb, SE, SW, [0, 0, 1]],
+    [NWb, SWb, SW, [-1, 0, 0]], [NWb, SW, NW, [-1, 0, 0]], [NEb, SEb, SE, [1, 0, 0]], [NEb, SE, NE, [1, 0, 0]],
+    [NWb, NEb, SEb, [0, -1, 0]], [NWb, SEb, SWb, [0, -1, 0]],
+  ];
+  solidMesh(ft, CM.fascia, q => [q[0] / 4, q[2] / 4]).castShadow = true;
+  return top;
+}
+
+// ---------- construcción de la casa (coordenadas del modelo Casco) ----------
+const FOOT = [[6, 0], [65.7, 0], [65.7, 15.5], [71, 15.5], [71, 37], [34, 37], [34, 31], [6, 31]];
+function buildCascoTemplate(){
+  house = new THREE.Group();
+  // platea de fundación bajo la huella
+  const sh = new THREE.Shape(FOOT.map(([x, z]) => new THREE.Vector2(x, -z)));
+  const sg = new THREE.ExtrudeGeometry(sh, { depth: 0.62, bevelEnabled: false }); sg.rotateX(-Math.PI / 2); sg.translate(0, -0.62, 0);
+  addMesh(sg, CM.found, house, false, true);
+  // losas de hormigón: pad oeste, patio trasero, porch y escalón
+  wbox(0, -0.62, 0, 6, -0.18, 37, CM.concrete, { cast: false });
+  wbox(6, -0.62, 31, 34, -0.18, 37, CM.concrete, { cast: false });
+  wbox(65.7, -0.62, -0.2, 71.2, -0.08, 15.5, CM.concrete, { cast: false });
+  wbox(71.2, -0.62, 5.5, 73, -0.35, 10.5, CM.concrete, { cast: false }); // escalón
+  // piso y cielorraso (cierran el interior que se ve por los vidrios)
+  hpoly(FOOT, 0.002, CM.floor);
+  hpoly(FOOT, CEIL, CM.ceiling, false);
+  // paredes perimetrales con sus aberturas reales
+  wall(6, 0, 65.7, 0, TE, EXT_H, [WIN(26, 28.5), WIN(33.2, 36.2, 6.5, 7.85), WIN(41, 43.5, 2.6), WIN(49.3, 52.3, 6.5, 7.85)], -1); // norte
+  wall(65.7, 0, 65.7, 15.5, TE, EXT_H, [WIN(3.6, 5.6, 3.7, 7.3), WIN(6.4, 8.4, 3.7, 7.3), DOOR(12, 15, 6.83, { hinge: 'a', side: -1, mat: CM.extDoor })], 1); // este (cocina/porch): puerta principal
+  wall(65.7, 15.5, 71, 15.5, TE, EXT_H, [], -1);  // quiebre al norte del great room
+  wall(71, 15.5, 71, 37, TE, EXT_H, [WIN(21.5, 24), WIN(31, 33.5)], 1); // este great room
+  wall(34, 37, 71, 37, TE, EXT_H, [WIN(42.3, 44.8, 2.6)], 1);   // sur bed2 + great
+  wall(34, 31, 34, 37, TE, EXT_H, [], -1);                     // oeste de bed2 (quiebre del patio)
+  wall(6, 31, 34, 31, TE, EXT_H, [WIN(16.4, 18.4, 5.3, 7.3), WIN(25.4, 28.9), DOOR(30.3, 33.3, 6.83, { hinge: 'a', side: -1, mat: CM.extDoor })], 1); // sur family/baños, puerta trasera
+  wall(6, 0, 6, 31, TE, EXT_H, [WIN(4.0, 7.1, 2.6), DOOR(12.6, 15.4, 6.83, { hinge: 'a', side: 1, swing: true }), WIN(17.9, 21.0, 2.6)], -1); // oeste master/storage
+  // techos: cuerpo principal y ala great room / bed2
+  hipRoof(6 - OVER, 0 - OVER, 65.7 + OVER, 31 + OVER, SOFFIT);
+  hipRoof(34 - OVER, 15.5 - OVER, 71 + OVER, 37 + OVER, SOFFIT + 0.004);
+  // porch: techo propio más bajo, inclinado al este, con columnas
+  {
+    const x0 = 65.7 + TE / 2, x1 = 72.3, z0 = -0.9, z1 = 15.5, bot = 8.05, hiT = 9.32, loT = hiT - (x1 - x0) * (2.5 / 12), loB = loT - 0.38;
+    const P = (x, y, z) => [x, y, z];
+    const tris = [
+      [P(x0, hiT, z0), P(x1, loT, z0), P(x1, loT, z1), [0, 1, 0], 't'], [P(x0, hiT, z0), P(x1, loT, z1), P(x0, hiT, z1), [0, 1, 0], 't'],
+    ];
+    const top = solidMesh(tris, CM.roof, (q, f) => [q[2], (q[0] - x0) * 1.03]); top.userData.isRoof = true;
+    const sides = [
+      [P(x0, bot, z0), P(x1, loB, z0), P(x1, loT, z0), [0, 0, -1]], [P(x0, bot, z0), P(x1, loT, z0), P(x0, hiT, z0), [0, 0, -1]],
+      [P(x0, bot, z1), P(x1, loB, z1), P(x1, loT, z1), [0, 0, 1]], [P(x0, bot, z1), P(x1, loT, z1), P(x0, hiT, z1), [0, 0, 1]],
+      [P(x1, loB, z0), P(x1, loB, z1), P(x1, loT, z1), [1, 0, 0]], [P(x1, loB, z0), P(x1, loT, z1), P(x1, loT, z0), [1, 0, 0]],
+      [P(x0, bot, z0), P(x1, loB, z0), P(x1, loB, z1), [0, -1, 0]], [P(x0, bot, z0), P(x1, loB, z1), P(x0, bot, z1), [0, -1, 0]],
+    ];
+    solidMesh(sides, CM.fascia, q => [q[0] / 4, q[2] / 4]);
+    for (const z of [-0.4, 5.0, 10.3, 15.0]) { wbox(70.9, -0.08, z - 0.3, 71.5, loB - 0.02, z + 0.3, CM.trim); wbox(70.75, -0.08, z - 0.45, 71.65, 0.6, z + 0.45, CM.trim); }
+  }
+  // sillones del porch
+  for (const z of [3.0, 7.0]) {
+    const g = grp(68.5, z, Math.PI / 2); g.position.y = -0.08;
+    lb(g, 2.2, 0.2, 2.2, CM.wood, 0, 1.4, 0); lb(g, 2.2, 2.2, 0.2, CM.wood, 0, 1.6, -1.0);
+    lb(g, 0.15, 1.4, 2.2, CM.wood, -1.0, 0, 0); lb(g, 0.15, 1.4, 2.2, CM.wood, 1.0, 0, 0);
+  }
+  // unidad exterior de A/C contra la pared sur
+  {
+    const g = grp(46.5, 38.6, 0);
+    lb(g, 3.1, 0.25, 3.1, CM.concrete, 0, -0.62, 0);
+    lb(g, 2.8, 2.6, 2.8, CM.ac, 0, -0.37, 0);
+    lc(g, 1.1, 0.05, CM.dark, 0, 2.23);
+  }
+  return house;
+}
+
+// ---------- fusión de geometrías por material ----------
+function mergeGeos(geos){
+  let total = 0;
+  for (const g of geos) total += g.attributes.position.count;
+  const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), uv = new Float32Array(total * 2);
+  let o3 = 0, o2 = 0;
+  for (const g of geos) {
+    pos.set(g.attributes.position.array, o3);
+    nor.set(g.attributes.normal.array, o3);
+    uv.set(g.attributes.uv.array, o2);
+    o3 += g.attributes.position.count * 3;
+    o2 += g.attributes.position.count * 2;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return out;
+}
+function buildCascoMerged(){
+  const tpl = buildCascoTemplate();
+  tpl.updateMatrixWorld(true);
+  const buckets = new Map();
+  tpl.traverse(o => {
+    if (!o.isMesh) return;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+    g.applyMatrix4(o.matrixWorld);
+    if (!buckets.has(o.material)) buckets.set(o.material, []);
+    buckets.get(o.material).push(g);
+  });
+  const merged = new THREE.Group();
+  let meshCount = 0;
+  for (const [mat, geos] of buckets) {
+    const m = new THREE.Mesh(mergeGeos(geos), mat);
+    m.castShadow = mat !== CM.glass;
+    m.receiveShadow = true;
+    if (mat === CM.stucco) m.userData.isStucco = true;
+    merged.add(m); meshCount++;
+  }
+  merged.userData.meshCount = meshCount;
+  return merged;
+}
+const cascoTpl = buildCascoMerged();
+
 // ---------- ubicación de las 11 casas (porción este del lote) ----------
+// El frente de la casa Casco es su lado este local (+x): al rotar, el porch
+// queda mirando a la calle interna. Filas desfasadas como en el plano.
 const houses = [];
-const rowA = [-60, 50, 160, 270, 380, 490].map(x => ({ x, z:-33, rot:0 }));          // 6 al norte de la calle, frente al sur
-const rowB = [-5, 105, 215, 325, 435].map(x => ({ x, z:33, rot:Math.PI }));          // 5 al sur, frente al norte, desfasadas
+const rowA = [-60, 50, 160, 270, 380, 490].map(x => ({ x, z:-75, rot:-Math.PI/2 })); // 6 al norte de la calle, frente al sur
+const rowB = [-5, 105, 215, 325, 435].map(x => ({ x, z:75, rot:Math.PI/2 }));         // 5 al sur, frente al norte, desfasadas
 [...rowA, ...rowB].forEach((p, i) => {
-  const h = buildHouse(i);
-  h.position.set(p.x, 0, p.z);
-  h.rotation.y = p.rot;
-  h.userData.index = i;
-  h.traverse(o => { o.userData.houseIndex = i; });
-  scene.add(h); houses.push(h);
+  const outer = new THREE.Group();
+  const inner = cascoTpl.clone();
+  inner.position.set(-36, 0.62, -18.5); // centra la huella y apoya la platea en el suelo
+  inner.traverse(o => { if (o.userData.isStucco) { o.material = CM.stucco.clone(); outer.userData.wallMat = o.material; } });
+  outer.add(inner);
+  // vereda desde la calle al escalón del porch y entrada de autos lateral
+  flat(M.concrete, 22, 3, 48, -10.5, 0.07, outer);
+  flat(M.concrete, 22, 14, 48, 8.5, 0.06, outer);
+  outer.position.set(p.x, 0, p.z);
+  outer.rotation.y = p.rot;
+  outer.userData.index = i;
+  outer.traverse(o => { o.userData.houseIndex = i; });
+  scene.add(outer); houses.push(outer);
 });
+
+// =====================================================================
+// ENTORNO / VECINDARIO (contexto, más simple que las casas protagonistas)
+// =====================================================================
+// ---------- norte: local de comidas rápidas junto a la ruta ----------
+// La entrada del lote pasa justo al sur de este local.
+(function(){
+  const g = new THREE.Group();
+  const wallM = new THREE.MeshStandardMaterial({ color:0xe9e3d7, roughness:.9 });
+  box(wallM, 66, 15, 34, 0, 7.5, 0, g);
+  box(M.roof, 68, 1.2, 36, 0, 15.4, 0, g);                        // techo plano
+  const band = new THREE.MeshStandardMaterial({ color:0xa33b32, roughness:.7 });
+  box(band, 66.4, 2.2, 34.4, 0, 12.6, 0, g, false);                // franja de color
+  box(M.glassDark, 52, 6, 0.4, 0, 4.2, 17.1, g, false);           // vidriera hacia el sur
+  box(M.door, 5, 8, 0.4, 28, 4, 17.1, g, false);
+  g.position.set(-572, 0, -152);
+  scene.add(g);
+  flat(M.asphalt, 76, 12, -572, -132, 0.05);                       // su estacionamiento, entre el local y la entrada
+})();
+
+// ---------- norte, tras la arboleda: casas de Swann Dr ----------
+flat(M.asphalt, 1150, 18, 30, -172, 0.04);                         // calle Swann Dr
+(function(){
+  const cols = [0xe8e0d0, 0xdfe4e6, 0xe6d3b8, 0xdde8da, 0xead9c9];
+  let k = 0;
+  for (let x = -470; x <= 540; x += 92, k++) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: cols[k % cols.length], roughness:.9 });
+    box(mat, 38, 11, 28, 0, 5.5, 0, g);
+    const r = new THREE.Mesh(hipRoofGeo(42, 32, 6.5, 22), k % 2 ? M.roofAlt : M.roof);
+    r.position.y = 11; r.castShadow = true; r.receiveShadow = true; g.add(r);
+    box(M.door, 3.4, 7, 0.3, -6, 3.5, 14.1, g, false);
+    box(M.glassDark, 5, 3.6, 0.3, 8, 6, 14.1, g, false);
+    box(M.glassDark, 5, 3.6, 0.3, -14, 6, 14.1, g, false);
+    g.position.set(x + (k % 3) * 4 - 4, 0, -198);
+    scene.add(g);
+    flat(M.concrete, 11, 26, x - 8, -183, 0.05);                   // entrada de autos
+  }
+})();
+
+// ---------- sur: plaza comercial ----------
+// Locales bajos de techo plano con estacionamiento al frente (lado norte).
+(function(){
+  flat(M.asphalt, 800, 15, -45, 167, 0.045);                       // estacionamiento de la plaza
+  const defs = [
+    { x:-330, w:150, c:0xd9cfc0 }, { x:-150, w:170, c:0xcfc4b2 },
+    { x:40, w:150, c:0xdcd6c8 },   { x:225, w:130, c:0xc9bda6 },
+  ];
+  for (const d of defs) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: d.c, roughness:.92 });
+    box(mat, d.w, 17, 48, 0, 8.5, 0, g);
+    box(M.roof, d.w + 3, 1.4, 51, 0, 17.6, 0, g);
+    box(M.glassDark, d.w * 0.82, 7.5, 0.4, 0, 4.6, -24.1, g, false); // vidrieras al norte
+    box(M.concrete, d.w * 0.9, 0.35, 6, 0, 0.18, -27, g, false);     // vereda
+    g.position.set(d.x, 0, 198);
+    scene.add(g);
+  }
+})();
+
+// ---------- sudeste: complejo de departamentos (3 plantas) ----------
+(function(){
+  flat(M.asphalt, 215, 135, 460, 250, 0.04);
+  const defs = [[395, 218], [520, 208], [390, 288], [525, 282]];
+  let k = 0;
+  for (const [x, z] of defs) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: k++ % 2 ? 0xd8cdb8 : 0xe3d9c8, roughness:.92 });
+    box(mat, 104, 31, 42, 0, 15.5, 0, g);
+    const r = new THREE.Mesh(hipRoofGeo(108, 46, 7, 62), M.roof);
+    r.position.y = 31; r.castShadow = true; r.receiveShadow = true; g.add(r);
+    for (const yy of [8.5, 18.5, 27]) box(M.glassDark, 104.5, 2.4, 42.5, 0, yy, 0, g, false); // filas de ventanas
+    g.position.set(x, 0, z);
+    scene.add(g);
+  }
+})();
 
 // ---------- árboles ----------
 function tree(x, z, s=1){
@@ -352,17 +753,49 @@ function tree(x, z, s=1){
 }
 // franja de pasto entre la ruta y el edificio: algunos árboles
 for (const z of [-64, -24, 26, 76]) tree(-592 + rnd() * 6, z);
-// líneas densas de árboles en los bordes norte y sur
-for (let x = -585; x <= 585; x += 26 + rnd() * 10) { tree(x, -150 + rnd() * 8); if (rnd() > .4) tree(x + 12, -141 + rnd() * 6); }
+// líneas densas de árboles en los bordes norte y sur (al norte, hueco en el local de comidas)
+for (let x = -585; x <= 585; x += 26 + rnd() * 10) {
+  if (!(x > -625 && x < -518)) { tree(x, -150 + rnd() * 8); if (rnd() > .4) tree(x + 12, -141 + rnd() * 6); }
+}
 for (let x = -585; x <= 585; x += 26 + rnd() * 10) { tree(x, 150 - rnd() * 8); if (rnd() > .4) tree(x + 12, 141 - rnd() * 6); }
 // bosque denso cerrando el extremo este
-for (let i = 0; i < 26; i++) tree(548 + rnd() * 48, -148 + rnd() * 296, 1.15);
-// árboles sueltos en el campo abierto del oeste y entre las casas
+for (let i = 0; i < 34; i++) tree(548 + rnd() * 48, -148 + rnd() * 296, 1.15);
+// árboles sueltos en el campo abierto del oeste
 for (let i = 0; i < 16; i++) {
   const x = -400 + rnd() * 300, z = (rnd() > .5 ? 1 : -1) * (60 + rnd() * 70);
   tree(x, z);
 }
-for (let i = 0; i < 8; i++) tree(-40 + rnd() * 560, (rnd() > .5 ? 1 : -1) * (105 + rnd() * 30));
+// árboles en los huecos entre casas, detrás de cada fila
+for (const gx of [-5, 105, 215, 325, 435]) { tree(gx, -118); tree(gx + 6, 118); }
+
+// ---------- autos (geometrías y materiales compartidos) ----------
+const carGeos = {
+  body: new THREE.BoxGeometry(12.5, 2.7, 5.4),
+  cab: new THREE.BoxGeometry(6.6, 2.3, 4.9),
+  wheel: new THREE.CylinderGeometry(1.05, 1.05, 0.8, 10),
+};
+const tireMat = new THREE.MeshStandardMaterial({ color:0x1c1c1e, roughness:.95 });
+const carCols = [0xc0c4c8, 0x7a8894, 0xa33327, 0x2e4a6b, 0xe3e0d8, 0x3a3f44];
+let carIdx = 0;
+function car(x, z, rot){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: carCols[carIdx++ % carCols.length], roughness:.35, metalness:.5 });
+  const b = new THREE.Mesh(carGeos.body, mat); b.position.y = 2.0; b.castShadow = true; g.add(b);
+  const c = new THREE.Mesh(carGeos.cab, M.glassDark); c.position.set(-0.4, 4.2, 0); c.castShadow = true; g.add(c);
+  for (const [wx, wz] of [[-4.2, 2.5], [4.2, 2.5], [-4.2, -2.5], [4.2, -2.5]]) {
+    const w = new THREE.Mesh(carGeos.wheel, tireMat);
+    w.rotation.x = Math.PI / 2; w.position.set(wx, 1.05, wz); g.add(w);
+  }
+  g.position.set(x, 0, z); g.rotation.y = rot;
+  scene.add(g);
+}
+car(-472, -42, 0.03); car(-428, 48, -0.03);        // estacionamiento del edificio existente
+car(-592, -132, 0.06); car(-550, -132.5, -0.05);   // local de comidas
+car(-262, 166, 0.04); car(-58, 167, -0.03); car(150, 166, 0.02); // plaza comercial
+car(452, 244, 0.5); car(470, 240, -0.3);           // departamentos
+car(41.5, -27, -Math.PI/2);                        // entrada de la Casa 2
+car(371.5, -27, -Math.PI/2);                       // entrada de la Casa 5
+car(3.5, 27, Math.PI/2);                           // entrada de la Casa 7
 
 // ---------- interacción ----------
 const raycaster = new THREE.Raycaster();
@@ -375,6 +808,7 @@ function flyTo(pos, tgt, dur=1400){
 function highlight(i){
   houses.forEach((h, j) => {
     const m = h.userData.wallMat;
+    if (!m) return;
     if (j === i) { m.emissive = new THREE.Color(0xcf8a2d); m.emissiveIntensity = 0.38; }
     else { m.emissive = new THREE.Color(0x000000); m.emissiveIntensity = 0; }
   });
@@ -385,9 +819,9 @@ function selectHouse(i){
   selected = i;
   highlight(i);
   const h = houses[i];
-  const front = new THREE.Vector3(0, 0, 1).applyEuler(h.rotation);
+  const front = new THREE.Vector3(1, 0, 0).applyEuler(h.rotation); // frente Casco: +x local (porch)
   const side = new THREE.Vector3(front.z, 0, -front.x);
-  const camPos = h.position.clone().add(front.clone().multiplyScalar(66)).add(side.multiplyScalar(38)).add(new THREE.Vector3(0, 30, 0));
+  const camPos = h.position.clone().add(front.clone().multiplyScalar(80)).add(side.multiplyScalar(46)).add(new THREE.Vector3(0, 36, 0));
   flyTo(camPos, h.position.clone().add(new THREE.Vector3(0, 6, 0)));
   panelTitle.textContent = 'Casa ' + (i + 1);
   panel.classList.add('show');
@@ -400,7 +834,9 @@ function overview(){
 }
 window.__cardona = {
   selectHouse, overview, houses: houses.length,
-  camTo(px, py, pz, tx, ty, tz){ camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); }
+  houseMeshes: cascoTpl.userData.meshCount,
+  camTo(px, py, pz, tx, ty, tz){ camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); },
+  stats(){ let meshes = 0; scene.traverse(o => { if (o.isMesh) meshes++; }); return { meshes, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }; }
 };
 
 let downX = 0, downY = 0;
